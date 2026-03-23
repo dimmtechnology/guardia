@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Escáner de Salida - Guardia</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+    
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+    <style>
+        body { font-family: sans-serif; background: #2c3e50; color: white; margin: 0; text-align: center; }
+        #scanner-container { width: 100%; max-width: 500px; margin: auto; }
+        h1 { font-size: 1.5rem; margin: 15px 0; }
+        #status { font-size: 1.2rem; color: #1abc9c; font-weight: bold; margin-top: 10px;}
+    </style>
+</head>
+<body>
+
+    <h1>Escanear Credencial</h1>
+    
+    <div id="scanner-container">
+        <div id="reader" style="width: 100%;"></div>
+    </div>
+
+    <p id="status">Esperando escaneo...</p>
+
+    <script>
+       const firebaseConfig = {
+  apiKey: "AIzaSyBRdSbW4Aj7xgHXPo4hvrYh076Ronc4Xrg",
+  authDomain: "guardia-24695.firebaseapp.com",
+  projectId: "guardia-24695",
+  storageBucket: "guardia-24695.firebasestorage.app",
+  messagingSenderId: "398247161945",
+  appId: "1:398247161945:web:41ee9dc21ba3269d304148",
+  measurementId: "G-KP1DQXM8JX"
+};
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // Variable para evitar múltiples escaneos del mismo QR seguidos
+        let ultimoEscaneo = "";
+
+        // 2. Configurar el Escáner
+        const html5QrCode = new Html5Qrcode("reader");
+        const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+            // Si el código ya se escaneó hace poco, lo ignoramos
+            if (decodedText === ultimoEscaneo) return;
+            ultimoEscaneo = decodedText;
+
+            // Mostrar estado en pantalla
+            document.getElementById('status').innerText = `Enviando: ${decodedText}...`;
+
+            // ENVIAR A FIREBASE
+            const nuevoRef = db.ref('salidas').push();
+            nuevoRef.set({
+                nombreAlumno: decodedText, // El QR debe contener solo el nombre
+                hora: Date.now()
+            }).then(() => {
+                document.getElementById('status').innerText = `✅ ${decodedText} anunciado`;
+                // Emitir sonido de confirmación (opcional)
+                beep();
+            });
+
+            // Resetear el bloqueo de escaneo después de 3 segundos
+            setTimeout(() => { ultimoEscaneo = ""; }, 3000);
+        };
+
+        // Iniciar cámara trasera
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+        html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback);
+
+        // Sonido de beep
+        function beep() {
+            const context = new AudioContext();
+            const oscillator = context.createOscillator();
+            const gainNode = context.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(context.destination);
+            gainNode.gain.value = 0.1;
+            oscillator.frequency.value = 1000;
+            oscillator.type = "sine";
+            oscillator.start();
+            setTimeout(() => oscillator.stop(), 100);
+        }
+    </script>
+</body>
+</html>
