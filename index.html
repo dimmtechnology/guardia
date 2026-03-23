@@ -13,7 +13,7 @@
         body { font-family: sans-serif; background: #2c3e50; color: white; margin: 0; text-align: center; }
         #scanner-container { width: 100%; max-width: 500px; margin: auto; }
         h1 { font-size: 1.5rem; margin: 15px 0; }
-        #status { font-size: 1.2rem; color: #1abc9c; font-weight: bold; margin-top: 10px; }
+        #status { font-size: 1.2rem; color: #1abc9c; font-weight: bold; margin-top: 10px; padding: 0 10px; }
     </style>
 </head>
 <body>
@@ -25,11 +25,12 @@
     <p id="status">Esperando escaneo...</p>
 
     <script>
-        // 1. Configurar e inicializar Firebase (usando versión compat con CDN)
+        // 1. Configuración de Firebase CORREGIDA
         const firebaseConfig = {
             apiKey: "AIzaSyBRdSbW4Aj7xgHXPo4hvrYh076Ronc4Xrg",
             authDomain: "guardia-24695.firebaseapp.com",
-            databaseURL: "https://console.firebase.google.com/project/guardia-24695/hosting/sites/guardia-24695?hl=es-419", // ← Asegúrate de que esta URL sea correcta
+            // ESTA ES LA URL CORRECTA PARA TU PROYECTO:
+            databaseURL: "https://guardia-24695-default-rtdb.firebaseio.com", 
             projectId: "guardia-24695",
             storageBucket: "guardia-24695.firebasestorage.app",
             messagingSenderId: "398247161945",
@@ -37,13 +38,13 @@
             measurementId: "G-KP1DQXM8JX"
         };
 
+        // Inicializar Firebase
         firebase.initializeApp(firebaseConfig);
-        const db = firebase.database(); // ← Faltaba esta línea
+        const db = firebase.database(); 
 
-        // 2. Variable para evitar múltiples escaneos del mismo QR seguidos
         let ultimoEscaneo = "";
 
-        // 3. Configurar el Escáner
+        // 2. Configurar el Escáner
         const html5QrCode = new Html5Qrcode("reader");
 
         const qrCodeSuccessCallback = (decodedText, decodedResult) => {
@@ -53,8 +54,7 @@
             document.getElementById('status').innerText = `Enviando: ${decodedText}...`;
 
             // Enviar a Firebase
-            const nuevoRef = db.ref('salidas').push();
-            nuevoRef.set({
+            db.ref('salidas').push({
                 nombreAlumno: decodedText,
                 hora: Date.now()
             }).then(() => {
@@ -64,26 +64,33 @@
                 document.getElementById('status').innerText = `❌ Error: ${error.message}`;
             });
 
-            // Resetear el bloqueo después de 3 segundos
+            // Resetear bloqueo después de 3 segundos
             setTimeout(() => { ultimoEscaneo = ""; }, 3000);
         };
 
-        // 4. Iniciar cámara trasera
+        // 3. Iniciar cámara
         const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-        html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback);
+        
+        // El método start debe ejecutarse tras la interacción del usuario o al cargar
+        html5QrCode.start({ facingMode: "environment" }, config, qrCodeSuccessCallback)
+            .catch((err) => {
+                document.getElementById('status').innerText = "Error al abrir cámara: " + err;
+            });
 
-        // 5. Sonido de confirmación
+        // 4. Sonido
         function beep() {
-            const context = new AudioContext();
-            const oscillator = context.createOscillator();
-            const gainNode = context.createGain();
-            oscillator.connect(gainNode);
-            gainNode.connect(context.destination);
-            gainNode.gain.value = 0.1;
-            oscillator.frequency.value = 1000;
-            oscillator.type = "sine";
-            oscillator.start();
-            setTimeout(() => oscillator.stop(), 100);
+            try {
+                const context = new (window.AudioContext || window.webkitAudioContext)();
+                const oscillator = context.createOscillator();
+                const gainNode = context.createGain();
+                oscillator.connect(gainNode);
+                gainNode.connect(context.destination);
+                gainNode.gain.value = 0.1;
+                oscillator.frequency.value = 1000;
+                oscillator.type = "sine";
+                oscillator.start();
+                setTimeout(() => oscillator.stop(), 100);
+            } catch(e) { console.log("Audio no soportado"); }
         }
     </script>
 </body>
